@@ -1,0 +1,48 @@
+{
+  "name": "ai-stocks-bridge",
+  "version": "0.1.0",
+  "description": "AI Stocks Bridge -- connects your browser to local AI CLI tools (Gemini, Claude, Codex)",
+  "main": "index.js",
+  "bin": {
+    "ai-stocks-bridge": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/katelin013/ai-stocks-bridge"
+  },
+  "keywords": [
+    "ai",
+    "stocks",
+    "bridge",
+    "gemini",
+    "claude",
+    "codex",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "files": [
+    "index.js",
+    "which.js",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "pkg": {
+    "targets": [
+      "node18-macos-arm64",
+      "node18-macos-x64",
+      "node18-win-x64"
+    ],
+    "outputPath": "dist",
+    "assets": [
+      "which.js"
+    ]
+  }
+}
