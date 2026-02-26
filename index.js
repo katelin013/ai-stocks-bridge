@@ -219,6 +219,10 @@ function cors(req, res) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Token");
+  // Chrome Private Network Access (PNA): allow public site → localhost requests
+  if (req.headers["access-control-request-private-network"]) {
+    res.setHeader("Access-Control-Allow-Private-Network", "true");
+  }
 }
 
 function checkHost(req) {
