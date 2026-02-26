@@ -6,7 +6,8 @@ const os = require("node:os");
 
 /**
  * Token-based authentication for Bridge.
- * Generates a random UUID token on startup, writes to file for Dashboard to read.
+ * Persists token across restarts — reads existing token from file if available,
+ * generates a new one only on first run.
  * @param {object} opts
  * @param {string} opts.tokenDir - Directory to store token file (default ~/.ai-stocks)
  */
@@ -14,11 +15,24 @@ function createTokenAuth({ tokenDir } = {}) {
   const dir = tokenDir || path.join(os.homedir(), ".ai-stocks");
   const tokenFile = path.join(dir, "bridge.token");
 
-  // Generate token
-  const token = crypto.randomUUID();
-
-  // Write to file
   fs.mkdirSync(dir, { recursive: true });
+
+  // Reuse existing token if available, otherwise generate new one
+  let token;
+  try {
+    const existing = fs.readFileSync(tokenFile, "utf-8").trim();
+    if (existing) {
+      token = existing;
+    }
+  } catch {
+    // File doesn't exist or unreadable — will generate new token
+  }
+
+  if (!token) {
+    token = crypto.randomUUID();
+  }
+
+  // Always write to ensure file exists with correct permissions
   fs.writeFileSync(tokenFile, token + "\n", { mode: 0o600 });
 
   return {

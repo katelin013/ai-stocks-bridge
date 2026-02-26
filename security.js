@@ -1,6 +1,9 @@
 "use strict";
 
+const os = require("node:os");
+
 const ALLOWED_ENV_KEYS = new Set([
+  // Unix
   "PATH",
   "HOME",
   "LANG",
@@ -8,6 +11,18 @@ const ALLOWED_ENV_KEYS = new Set([
   "SHELL",
   "USER",
   "TMPDIR",
+  // Windows
+  "USERPROFILE",
+  "USERNAME",
+  "APPDATA",
+  "LOCALAPPDATA",
+  "SystemRoot",
+  "TEMP",
+  "TMP",
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "PATHEXT",
+  "ComSpec",
 ]);
 
 function sanitizeEnv(env) {
@@ -130,10 +145,14 @@ function sanitizeOutput(text) {
     result = result.replace(pattern, replacement);
   }
 
-  // Anonymize HOME path
-  const home = process.env.HOME;
+  // Anonymize HOME path (cross-platform via os.homedir())
+  const home = os.homedir();
   if (home) {
     result = result.replaceAll(home, "[HOME]");
+    // Also replace forward-slash variant on Windows (some tools output C:/Users/...)
+    if (home.includes("\\")) {
+      result = result.replaceAll(home.replace(/\\/g, "/"), "[HOME]");
+    }
   }
 
   return result;

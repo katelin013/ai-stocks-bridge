@@ -15,6 +15,8 @@ const {
 } = require("./security");
 const { createRateLimiter } = require("./rate-limiter");
 const { createTokenAuth } = require("./token-auth");
+const { deriveKey, encrypt, decrypt, isEncryptedPrompt } = require("./crypto");
+const { version: PKG_VERSION } = require("./package.json");
 
 const PORT = parseInt(process.env.PORT || "7890", 10);
 const HOST = "127.0.0.1";
@@ -50,8 +52,8 @@ for (const [name, info] of Object.entries(CLI_REGISTRY)) {
   CLI_PATHS[name] = which(info.cmd);
 }
 
-// Create Codex sandbox (empty directory)
-const SANDBOX_DIR = "/tmp/ai-stocks-sandbox";
+// Create Codex sandbox (empty directory, cross-platform)
+const SANDBOX_DIR = path.join(os.tmpdir(), "ai-stocks-sandbox");
 fs.rmSync(SANDBOX_DIR, { recursive: true, force: true });
 fs.mkdirSync(SANDBOX_DIR, { recursive: true });
 
@@ -60,6 +62,7 @@ const rateLimiter = createRateLimiter({ capacity: 15, refillIntervalMs: 6000 });
 
 // Initialize token auth
 const auth = createTokenAuth();
+const encryptionKey = deriveKey(auth.getToken());
 
 // Pre-compute sanitized env
 const cleanEnv = sanitizeEnv(process.env);
@@ -181,7 +184,8 @@ function runCli(name, userPrompt) {
           return resolve({ cli: name, error: msg, success: false, elapsed });
         }
         const sanitized = sanitizeOutput(stdout.trim());
-        resolve({ cli: name, response: sanitized, success: true, elapsed });
+        const encResponse = encrypt(sanitized, encryptionKey);
+        resolve({ cli: name, response: encResponse, success: true, elapsed });
       },
     );
     child.stdin?.end();
@@ -262,13 +266,16 @@ const server = http.createServer(async (req, res) => {
 
   const url = req.url?.split("?")[0];
 
-  // Health endpoint — no auth required
+  // Health endpoint — no auth required, returns token for auto-sync
   if (url === "/health" && req.method === "GET") {
+    res.setHeader("Cache-Control", "no-store");
     return json(res, 200, {
       status: "ok",
       cli: detectClis(),
-      version: "0.2.0",
+      version: PKG_VERSION,
       security: true,
+      encryption: true,
+      token: auth.getToken(),
     });
   }
 
@@ -291,16 +298,21 @@ const server = http.createServer(async (req, res) => {
   if (url === "/analyze" && req.method === "POST") {
     try {
       const body = await readBody(req);
-      if (!body.prompt) return json(res, 400, { error: "prompt is required" });
+      let prompt = body.prompt;
+      if (isEncryptedPrompt(prompt)) {
+        try {
+          prompt = decrypt(prompt, encryptionKey);
+        } catch {
+          return json(res, 400, { error: "Decryption failed" });
+        }
+      }
+      if (!prompt || typeof prompt !== "string") {
+        return json(res, 400, { error: "prompt is required" });
+      }
       const cli = body.cli || "gemini";
-      audit(cli, req.headers.origin, body.prompt, "START");
-      const result = await runCli(cli, body.prompt);
-      audit(
-        cli,
-        req.headers.origin,
-        body.prompt,
-        result.success ? "OK" : "FAIL",
-      );
+      audit(cli, req.headers.origin, prompt, "START");
+      const result = await runCli(cli, prompt);
+      audit(cli, req.headers.origin, prompt, result.success ? "OK" : "FAIL");
       return json(res, result.success ? 200 : 502, result);
     } catch (e) {
       return json(res, 400, { error: e.message || "Invalid JSON" });
@@ -310,13 +322,23 @@ const server = http.createServer(async (req, res) => {
   if (url === "/multi-analyze" && req.method === "POST") {
     try {
       const body = await readBody(req);
-      if (!body.prompt) return json(res, 400, { error: "prompt is required" });
+      let prompt = body.prompt;
+      if (isEncryptedPrompt(prompt)) {
+        try {
+          prompt = decrypt(prompt, encryptionKey);
+        } catch {
+          return json(res, 400, { error: "Decryption failed" });
+        }
+      }
+      if (!prompt || typeof prompt !== "string") {
+        return json(res, 400, { error: "prompt is required" });
+      }
       const clis = body.clis || ["claude", "gemini"];
 
       // Rate limit: each CLI counts as 1 request (first already consumed above)
       for (let i = 1; i < clis.length; i++) {
         if (!rateLimiter.tryConsume()) {
-          audit("multi", req.headers.origin, body.prompt, "RATE_LIMITED");
+          audit("multi", req.headers.origin, prompt, "RATE_LIMITED");
           return json(res, 429, {
             error: "Too many requests",
             retryAfterMs: 6000,
@@ -324,16 +346,9 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      audit(
-        "multi:" + clis.join(","),
-        req.headers.origin,
-        body.prompt,
-        "START",
-      );
-      const results = await Promise.all(
-        clis.map((c) => runCli(c, body.prompt)),
-      );
-      audit("multi:" + clis.join(","), req.headers.origin, body.prompt, "OK");
+      audit("multi:" + clis.join(","), req.headers.origin, prompt, "START");
+      const results = await Promise.all(clis.map((c) => runCli(c, prompt)));
+      audit("multi:" + clis.join(","), req.headers.origin, prompt, "OK");
       return json(res, 200, {
         results,
         requestedClis: clis,
@@ -348,7 +363,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`\nAI Stocks Bridge v0.2.0 (Security Hardened)`);
+  console.log(`\nAI Stocks Bridge v${PKG_VERSION} (Encrypted)`);
   console.log(`Listening on http://${HOST}:${PORT}`);
   console.log(
     `Available CLIs: ${detectClis().join(", ") || "(none detected)"}`,

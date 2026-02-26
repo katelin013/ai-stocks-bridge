@@ -32,7 +32,7 @@ At least one AI CLI tool installed:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/health` | GET | Server status + detected CLIs |
+| `/health` | GET | Server status + detected CLIs + session token |
 | `/analyze` | POST | Single CLI analysis |
 | `/multi-analyze` | POST | Parallel multi-CLI analysis |
 
@@ -60,6 +60,13 @@ curl -X POST http://localhost:7890/multi-analyze \
 - **Zero dependencies** -- Uses only Node.js built-in modules
 - **Fully open source** -- Core code under 100 lines, review it yourself
 - **CORS restricted** -- Only allows requests from specified origins
+- **Token persistence** -- Session token is saved to `~/.ai-stocks/bridge.token` (mode 0600) and reused across restarts. The `/health` endpoint returns the current token so the frontend can auto-sync without manual re-entry.
+
+### Prompt Encryption
+
+All prompts and AI responses are encrypted with AES-256-GCM before transmission between browser and Bridge. The encryption key is derived from the session token using HKDF (SHA-256).
+
+**Important:** This encryption prevents casual inspection via browser DevTools. It is not a substitute for TLS in non-localhost environments. The key derivation is deterministic from the session token -- anyone with access to the token can derive the same key.
 
 ## How It Works
 
