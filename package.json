@@ -1,13 +1,14 @@
 {
   "name": "ai-stocks-bridge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AI Stocks Bridge -- connects your browser to local AI CLI tools (Gemini, Claude, Codex)",
   "main": "index.js",
   "bin": {
-    "ai-stocks-bridge": "./index.js"
+    "ai-stocks-bridge": "index.js"
   },
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "node --test test/*.test.js"
   },
   "engines": {
     "node": ">=18"
@@ -30,6 +31,9 @@
   "files": [
     "index.js",
     "which.js",
+    "security.js",
+    "rate-limiter.js",
+    "token-auth.js",
     "package.json",
     "README.md",
     "LICENSE"
