@@ -15,7 +15,7 @@ jobs:
           - os: macos-latest
             target: node18-macos-arm64
             artifact: ai-stocks-bridge-macos-arm64
-          - os: macos-13
+          - os: macos-latest
             target: node18-macos-x64
             artifact: ai-stocks-bridge-macos-x64
           - os: windows-latest
