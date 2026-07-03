@@ -16,6 +16,12 @@ const {
 const { createRateLimiter } = require("./rate-limiter");
 const { createTokenAuth } = require("./token-auth");
 const { deriveKey, encrypt, decrypt, isEncryptedPrompt } = require("./crypto");
+const {
+  createOpenAICompat,
+  createClaudeRunner,
+  defaultAgentCwd,
+  OPENAI_MAX_BODY_SIZE,
+} = require("./openai-compat");
 const { version: PKG_VERSION } = require("./package.json");
 
 const PORT = parseInt(process.env.PORT || "7890", 10);
@@ -66,6 +72,18 @@ const encryptionKey = deriveKey(auth.getToken());
 
 // Pre-compute sanitized env
 const cleanEnv = sanitizeEnv(process.env);
+
+// OpenAI-compatible layer (/v1/*) for local trusted clients (e.g. DSA agent)
+const openaiCompat = CLI_PATHS.claude
+  ? createOpenAICompat({
+      runClaude: createClaudeRunner({
+        cliPath: CLI_PATHS.claude,
+        env: cleanEnv,
+        cwd: defaultAgentCwd(),
+      }),
+      audit,
+    })
+  : null;
 
 // Concurrency tracking
 let activeClis = 0;
@@ -192,16 +210,16 @@ function runCli(name, userPrompt) {
   });
 }
 
-function readBody(req) {
+function readBody(req, maxSize = MAX_BODY_SIZE) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
     req.on("data", (c) => {
       size += c.length;
-      if (size > MAX_BODY_SIZE) {
+      if (size > maxSize) {
         req.destroy();
         return reject(
-          new Error(`Request body too large (max ${MAX_BODY_SIZE} bytes)`),
+          new Error(`Request body too large (max ${maxSize} bytes)`),
         );
       }
       chunks.push(c);
@@ -277,6 +295,62 @@ const server = http.createServer(async (req, res) => {
       encryption: true,
       token: auth.getToken(),
     });
+  }
+
+  // OpenAI-compatible routes (/v1/*) — local trusted clients authenticate with
+  // the same bridge token, sent as either X-Bridge-Token or Authorization Bearer.
+  if (url === "/v1/models" || url === "/v1/chat/completions") {
+    if (!openaiCompat) {
+      return json(res, 503, { error: "claude CLI not installed" });
+    }
+    const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    const v1Token = req.headers["x-bridge-token"] || bearer;
+    if (!auth.validate(v1Token)) {
+      recordViolation();
+      audit("claude-v1", req.headers.origin, "", "AUTH_FAIL");
+      return json(res, 401, {
+        error: {
+          message: "Invalid or missing token",
+          type: "auth_error",
+          code: 401,
+        },
+      });
+    }
+    if (url === "/v1/models" && req.method === "GET") {
+      return openaiCompat.handleModels(res);
+    }
+    if (url === "/v1/chat/completions" && req.method === "POST") {
+      if (!rateLimiter.tryConsume()) {
+        audit("claude-v1", req.headers.origin, "", "RATE_LIMITED");
+        return json(res, 429, {
+          error: {
+            message: "Too many requests",
+            type: "rate_limit_error",
+            code: 429,
+          },
+        });
+      }
+      let body;
+      try {
+        body = await readBody(req, OPENAI_MAX_BODY_SIZE);
+      } catch (e) {
+        return json(res, 400, {
+          error: {
+            message: e.message || "Invalid JSON",
+            type: "invalid_request_error",
+            code: 400,
+          },
+        });
+      }
+      audit(
+        "claude-v1",
+        req.headers.origin,
+        `messages=${body.messages?.length ?? 0}`,
+        "START",
+      );
+      return openaiCompat.handleChatCompletions(body, res);
+    }
+    return json(res, 405, { error: "Method not allowed" });
   }
 
   // All POST endpoints require token auth

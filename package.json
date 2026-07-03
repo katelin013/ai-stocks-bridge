@@ -35,6 +35,7 @@
     "crypto.js",
     "rate-limiter.js",
     "token-auth.js",
+    "openai-compat.js",
     "package.json",
     "README.md",
     "LICENSE"
