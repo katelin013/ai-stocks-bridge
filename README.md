@@ -24,7 +24,7 @@ At least one AI CLI tool installed:
 
 | CLI | Install | Docs |
 |-----|---------|------|
-| Gemini CLI | `npm install -g @anthropic-ai/gemini-cli` | [gemini.google.com](https://gemini.google.com) |
+| Antigravity CLI (`agy`, for Gemini) | [antigravity.google](https://antigravity.google) | [antigravity.google](https://antigravity.google) |
 | Claude CLI | `npm install -g @anthropic-ai/claude-code` | [claude.ai](https://claude.ai) |
 | Codex CLI | `npm install -g @openai/codex` | [openai.com](https://openai.com) |
 
@@ -99,7 +99,7 @@ Browser (AI Stocks SaaS)       Your Machine
 | React App   | -----------> | AI Stocks Bridge  |
 | :5173       | <----------- | localhost:7890    |
 +-------------+  JSON         |                  |
-                               | -> gemini CLI    |
+                               | -> agy (Gemini)  |
                                | -> claude CLI    |
                                | -> codex CLI     |
                                +------------------+
