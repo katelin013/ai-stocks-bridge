@@ -21,6 +21,7 @@ const {
   createClaudeRunner,
   defaultAgentCwd,
   OPENAI_MAX_BODY_SIZE,
+  CLAUDE_MODEL,
 } = require("./openai-compat");
 const { version: PKG_VERSION } = require("./package.json");
 
@@ -36,7 +37,7 @@ const ALLOWED_ORIGINS = [
 ];
 
 const CLI_REGISTRY = {
-  claude: { cmd: "claude", args: ["--print"], timeout: 120_000 },
+  claude: { cmd: "claude", args: ["--model", CLAUDE_MODEL, "--print"], timeout: 120_000 },
   gemini: {
     cmd: "gemini",
     args: ["-m", "gemini-3-flash-preview", "-o", "text"],

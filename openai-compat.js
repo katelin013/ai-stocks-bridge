@@ -32,6 +32,8 @@ const OPENAI_MAX_BODY_SIZE = 1024 * 1024; // 1MB — agent histories are large
 const CLAUDE_MAX_BUFFER = 16 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 240_000;
 const BRIDGE_MODEL_ID = "bridge-claude";
+// Pinned so the bridge never follows the CLI's environment default model.
+const CLAUDE_MODEL = "claude-opus-5-5[1m]";
 
 const STATIC_INSTRUCTION =
   "You are the tool-calling reasoning engine of a stock-analysis agent. " +
@@ -279,6 +281,8 @@ function createClaudeRunner({ cliPath, env, cwd, timeoutMs = DEFAULT_TIMEOUT_MS 
     return new Promise((resolve, reject) => {
       const args = [
         ...(resumeSessionId ? ["--resume", resumeSessionId] : []),
+        "--model",
+        CLAUDE_MODEL,
         "--tools",
         "",
         "--disallowedTools",
@@ -524,6 +528,7 @@ function defaultAgentCwd() {
 module.exports = {
   OPENAI_MAX_BODY_SIZE,
   BRIDGE_MODEL_ID,
+  CLAUDE_MODEL,
   STATIC_INSTRUCTION,
   OUTPUT_CONTRACT,
   stableStringify,
