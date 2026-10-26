@@ -61,10 +61,9 @@ describe("claude model pinning", () => {
 
   it("index.js claude registry passes --model CLAUDE_MODEL", () => {
     const src = fs.readFileSync(path.join(__dirname, "..", "index.js"), "utf8");
-    const entry = src
-      .split("\n")
-      .find((l) => /^\s*claude:\s*\{\s*cmd:\s*"claude"/.test(l));
+    const entry = src.match(/^\s*claude:\s*\{[\s\S]*?^\s*\},?/m)?.[0];
     assert.ok(entry, "claude registry entry not found");
+    assert.match(entry, /cmd:\s*"claude"/);
     assert.match(entry, /args:\s*\[\s*"--model",\s*CLAUDE_MODEL\s*,/);
   });
 });
