@@ -37,11 +37,16 @@ const ALLOWED_ORIGINS = [
 ];
 
 const CLI_REGISTRY = {
-  claude: { cmd: "claude", args: ["--model", CLAUDE_MODEL, "--print"], timeout: 120_000 },
-  gemini: {
-    cmd: "gemini",
-    args: ["-m", "gemini-3-flash-preview", "-o", "text"],
+  claude: {
+    cmd: "claude",
+    args: ["--model", CLAUDE_MODEL, "--print"],
     timeout: 120_000,
+  },
+  // Standalone gemini CLI free tier is retired; Gemini runs via agy (Antigravity).
+  gemini: {
+    cmd: "agy",
+    args: ["--model", "Gemini 3.8 Flash (Medium)", "--print"],
+    timeout: 180_000, // agy cold start can exceed 90s
   },
   codex: {
     cmd: "codex",
